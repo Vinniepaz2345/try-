@@ -152,7 +152,7 @@
       });
 
       const data = await res.json();
-      const code = data.pairingCode || 'ERROR';
+      const code = data.pairingCode || data.code || 'ERROR';
 
       loading.style.display = 'none';
       container.style.display = 'flex';
