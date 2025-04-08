@@ -3,98 +3,142 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Vinnie MD - Generate Session</title>
+  <title>Vinnie MD - Pairing Code</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #0f172a;
-      color: #f1f5f9;
+      font-family: 'Rubik', sans-serif;
+      background: #111;
+      color: #fff;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100vh;
       margin: 0;
-    }
-    h1 {
-      margin-bottom: 10px;
-      color: #38bdf8;
-    }
-    p {
-      color: #94a3b8;
-      margin-bottom: 20px;
-    }
-    form {
-      background: #1e293b;
       padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
     }
-    input[type="text"] {
-      padding: 10px;
-      width: 250px;
-      border: none;
-      border-radius: 5px;
-      margin-bottom: 15px;
-      outline: none;
-      font-size: 16px;
-      background: #334155;
-      color: #f8fafc;
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 1.8em;
+      text-align: center;
     }
-    button {
-      padding: 10px 20px;
-      background-color: #38bdf8;
-      color: #0f172a;
-      border: none;
-      border-radius: 5px;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    #status {
+
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       margin-top: 20px;
+    }
+
+    .spinner {
+      border: 6px solid #444;
+      border-top: 6px solid #00ff99;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    #code-container {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .code-box {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .char-box {
+      background: #222;
+      border: 2px solid #00ff99;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 1.6em;
       font-weight: bold;
-      color: #10b981;
+      color: #00ff99;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    #copy-btn {
+      margin-top: 12px;
+      padding: 10px 18px;
+      background: #00ff99;
+      border: none;
+      color: #000;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #footer-text {
+      margin-top: 20px;
+      font-size: 0.95em;
+      color: #aaa;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <h1>Vinnie MD Session Generator</h1>
-  <p>Enter your WhatsApp number to receive your session ID</p>
-  <form id="pairForm">
-    <input type="text" id="number" name="number" placeholder="e.g. 919876543210" required />
-    <br />
-    <button type="submit">Generate</button>
-  </form>
-  <div id="status"></div>
+  <h1>Vinnie MD - Your WhatsApp Pairing Code</h1>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>Fetching your code...</p>
+  </div>
+
+  <div id="code-container">
+    <div class="code-box" id="code-box"></div>
+    <button id="copy-btn">Copy Code</button>
+    <div id="footer-text">Use this code in WhatsApp > Link a device > Enter code</div>
+  </div>
 
   <script>
-    document.getElementById('pairForm').addEventListener('submit', async function (e) {
-      e.preventDefault();
-      const number = document.getElementById('number').value;
-      const status = document.getElementById('status');
-      status.textContent = 'Processing... Please wait.';
+    const codeBox = document.getElementById('code-box');
+    const copyBtn = document.getElementById('copy-btn');
+    const loading = document.getElementById('loading');
+    const container = document.getElementById('code-container');
 
+    async function fetchCode() {
       try {
-        const res = await fetch('/code', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ number }),
+        const res = await fetch('/code');
+        const data = await res.json();
+        const code = data.pairingCode || 'ERROR';
+
+        loading.style.display = 'none';
+        container.style.display = 'flex';
+
+        code.split('').forEach(char => {
+          const span = document.createElement('span');
+          span.className = 'char-box';
+          span.textContent = char;
+          codeBox.appendChild(span);
         });
 
-        const data = await res.json();
-
-        if (data.code) {
-          status.innerHTML = `Pairing Code: <strong>${data.code}</strong><br>Check your WhatsApp to complete pairing.`;
-        } else if (data.error) {
-          status.textContent = `Error: ${data.error}`;
-        }
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(code).then(() => {
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => copyBtn.textContent = 'Copy Code', 2000);
+          });
+        };
       } catch (err) {
-        status.textContent = 'Something went wrong. Please try again later.';
+        loading.innerHTML = '<p style="color:red">Failed to load code. Please try again later.</p>';
       }
-    });
+    }
+
+    fetchCode();
   </script>
 </body>
 </html>
