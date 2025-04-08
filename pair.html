@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Vinnie MD - Generate Session</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    h1 {
+      margin-bottom: 10px;
+      color: #38bdf8;
+    }
+    p {
+      color: #94a3b8;
+      margin-bottom: 20px;
+    }
+    form {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 250px;
+      border: none;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      outline: none;
+      font-size: 16px;
+      background: #334155;
+      color: #f8fafc;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #38bdf8;
+      color: #0f172a;
+      border: none;
+      border-radius: 5px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #10b981;
+    }
+  </style>
+</head>
+<body>
+  <h1>Vinnie MD Session Generator</h1>
+  <p>Enter your WhatsApp number to receive your session ID</p>
+  <form id="pairForm">
+    <input type="text" id="number" name="number" placeholder="e.g. 919876543210" required />
+    <br />
+    <button type="submit">Generate</button>
+  </form>
+  <div id="status"></div>
+
+  <script>
+    document.getElementById('pairForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const number = document.getElementById('number').value;
+      const status = document.getElementById('status');
+      status.textContent = 'Processing... Please wait.';
+
+      try {
+        const res = await fetch('/code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ number }),
+        });
+
+        const data = await res.json();
+
+        if (data.code) {
+          status.innerHTML = `Pairing Code: <strong>${data.code}</strong><br>Check your WhatsApp to complete pairing.`;
+        } else if (data.error) {
+          status.textContent = `Error: ${data.error}`;
+        }
+      } catch (err) {
+        status.textContent = 'Something went wrong. Please try again later.';
+      }
+    });
+  </script>
+</body>
+</html>
