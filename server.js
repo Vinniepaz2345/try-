@@ -1,116 +1,86 @@
-require('dotenv').config();
 const express = require('express');
+const { default: makeWASocket, useMultiFileAuthState, makeCacheableSignalKeyStore, Browsers } = require('@whiskeysockets/baileys');
+const { delay } = require('@whiskeysockets/baileys/lib/Utils');
+const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
-const { Storage } = require('megajs');
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  delay,
-  makeCacheableSignalKeyStore,
-  Browsers,
-} = require('@whiskeysockets/baileys');
-const pino = require('pino');
+const { uploadToMega } = require('./src/id');
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname)));
-
 const PORT = process.env.PORT || 3000;
-
-function randomId(len = 6) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let str = '';
-  for (let i = 0; i < len; i++) str += chars[Math.floor(Math.random() * chars.length)];
-  return str + Math.floor(Math.random() * 10000);
-}
-
-const uploadToMega = async (filePath) => {
-  const storage = await new Storage({
-    email: process.env.MEGA_EMAIL,
-    password: process.env.MEGA_PASSWORD,
-  }).ready;
-
-  const up = await storage.upload({
-    name: `${randomId()}.json`,
-    size: fs.statSync(filePath).size,
-  }, fs.createReadStream(filePath)).complete;
-
-  const fileNode = storage.files[up.nodeId];
-  return await fileNode.link();
-};
-
-const cleanUp = (dir) => fs.rmSync(dir, { recursive: true, force: true });
+app.use(express.static('public'));
+app.use(express.json());
 
 app.post('/code', async (req, res) => {
-  const number = req.body.number?.replace(/[^0-9]/g, '');
-  if (!number) return res.status(400).json({ error: 'Missing phone number' });
+  const phone = req.body.phone;
+  if (!phone) return res.status(400).json({ error: 'Phone number is required' });
 
-  const id = randomId();
-  const sessionPath = `./session_${id}`;
-
+  const sessionPath = `./session/${phone}`;
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
   const sock = makeWASocket({
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" })),
+      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
     },
     printQRInTerminal: false,
-    logger: pino({ level: "fatal" }),
+    logger: pino({ level: 'fatal' }),
     browser: Browsers.macOS('Safari'),
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  if (!sock.authState.creds.registered) {
-    await delay(1500);
-    try {
-      const code = await sock.requestPairingCode(number);
-      res.json({ code });
+  try {
+    // Generate fresh pairing code
+    if (!sock.authState.creds.registered) {
+      await delay(1000); // Short delay before requesting code
+      const code = await sock.requestPairingCode(phone);
+      console.log(`Pairing code for ${phone}: ${code}`);
+      res.json({ code }); // Send pairing code back to frontend
 
-      sock.ev.on("connection.update", async ({ connection }) => {
-        if (connection === "open") {
-          await delay(7000);
+      sock.ev.on('connection.update', async ({ connection }) => {
+        console.log('Connection status:', connection);
+
+        if (connection === 'open') {
+          await delay(7000); // Wait a bit for session file to be saved
 
           const filePath = `${sessionPath}/creds.json`;
           if (!fs.existsSync(filePath)) return;
 
-          const megaUrl = await uploadToMega(filePath);
+          const megaUrl = await uploadToMega(filePath, `${phone}.json`);
           const sessionId = megaUrl.replace('https://mega.nz/file/', '');
 
-          const message1 = `*✅ Your Session ID:*\n\n${sessionId}`;
+          const message1 = `*✅ Your Session ID:*\n\`\`\`${sessionId}\`\`\``;
           const message2 = `
-╭─❍ *Vinnie-MD Session Paired*
-├ 📎 Use this ID in your bot repo
-├ 🎓 Tutorial: youtube.com/@vinniebot
-├ 💬 Support: t.me/vinniebotdevs
-├ ⭐ Repo: github.com/vinniebot/vinnie-md
-╰─❍ *Enjoy Vinnie MD v5.0.0*
-`;
+*Vinnie-MD Session Paired*
+🔗 Use this ID in your bot repo
 
-          await sock.sendMessage(sock.user.id, { text: message1 });
-          await sock.sendMessage(sock.user.id, { text: message2 });
+🎓 Tutorial: youtube.com/@vinniebot
+💬 Support: t.me/vinniebotdevs
+📁 Repo: github.com/vinniebot/vinnie-md
+          `;
 
-          await delay(2000);
-          await sock.ws.close();
-          cleanUp(sessionPath);
+          console.log('Session ID sent:', sessionId);
+
+          // Clean up after sending
+          fs.rmSync(sessionPath, { recursive: true, force: true });
+
+          // Optionally send this to user via a bot/webhook if needed
+        }
+
+        if (connection === 'close') {
+          console.warn('Connection closed before pairing.');
         }
       });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Failed to generate pairing code.' });
+    } else {
+      res.status(400).json({ error: 'Already registered' });
     }
-  } else {
-    res.status(400).json({ error: 'Already registered.' });
+  } catch (err) {
+    console.error('Error during pairing:', err);
+    res.status(500).json({ error: 'Failed to generate pairing code' });
   }
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'pair.html'));
-});
-
 app.listen(PORT, () => {
-  console.log(`Vinnie Pairing Server running on port ${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
