@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Vinnie MD - Pairing Code</title>
+  <title>Vinnie MD - Pairing Code Generator</title>
   <link href="https://fonts.googleapis.com/css2?family=Rubik&display=swap" rel="stylesheet">
   <style>
     body {
@@ -25,8 +25,27 @@
       text-align: center;
     }
 
+    input, button {
+      padding: 10px;
+      font-size: 1em;
+      border-radius: 6px;
+      border: none;
+      margin: 8px;
+    }
+
+    input {
+      width: 200px;
+    }
+
+    #submit-btn {
+      background: #00ff99;
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
     #loading {
-      display: flex;
+      display: none;
       flex-direction: column;
       align-items: center;
       margin-top: 20px;
@@ -36,8 +55,8 @@
       border: 6px solid #444;
       border-top: 6px solid #00ff99;
       border-radius: 50%;
-      width: 60px;
-      height: 60px;
+      width: 50px;
+      height: 50px;
       animation: spin 1s linear infinite;
     }
 
@@ -92,11 +111,16 @@
   </style>
 </head>
 <body>
-  <h1>Vinnie MD - Your WhatsApp Pairing Code</h1>
+  <h1>Vinnie MD - Generate WhatsApp Pairing Code</h1>
+
+  <form id="code-form">
+    <input type="text" id="phone" placeholder="Enter your number" required />
+    <button id="submit-btn" type="submit">Generate Code</button>
+  </form>
 
   <div id="loading">
     <div class="spinner"></div>
-    <p>Fetching your code...</p>
+    <p>Generating code...</p>
   </div>
 
   <div id="code-container">
@@ -106,14 +130,23 @@
   </div>
 
   <script>
-    const codeBox = document.getElementById('code-box');
-    const copyBtn = document.getElementById('copy-btn');
+    const form = document.getElementById('code-form');
+    const phoneInput = document.getElementById('phone');
     const loading = document.getElementById('loading');
     const container = document.getElementById('code-container');
+    const codeBox = document.getElementById('code-box');
+    const copyBtn = document.getElementById('copy-btn');
 
-    async function fetchCode() {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const phone = phoneInput.value.trim();
+      if (!phone) return;
+
+      form.style.display = 'none';
+      loading.style.display = 'flex';
+
       try {
-        const res = await fetch('/code');
+        const res = await fetch(`/code?number=${encodeURIComponent(phone)}`);
         const data = await res.json();
         const code = data.pairingCode || 'ERROR';
 
@@ -134,11 +167,9 @@
           });
         };
       } catch (err) {
-        loading.innerHTML = '<p style="color:red">Failed to load code. Please try again later.</p>';
+        loading.innerHTML = '<p style="color:red">Something went wrong.</p>';
       }
-    }
-
-    fetchCode();
+    };
   </script>
 </body>
 </html>
