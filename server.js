@@ -45,7 +45,7 @@ const cleanUp = (dir) => fs.rmSync(dir, { recursive: true, force: true });
 
 app.post('/code', async (req, res) => {
   const number = req.body.number?.replace(/[^0-9]/g, '');
-  if (!number) return res.status(400).send({ error: 'Missing phone number' });
+  if (!number) return res.status(400).json({ error: 'Missing phone number' });
 
   const id = randomId();
   const sessionPath = `./session_${id}`;
@@ -66,21 +66,22 @@ app.post('/code', async (req, res) => {
 
   if (!sock.authState.creds.registered) {
     await delay(1500);
-    const code = await sock.requestPairingCode(number);
-    res.send({ code });
+    try {
+      const code = await sock.requestPairingCode(number);
+      res.json({ code });
 
-    sock.ev.on("connection.update", async ({ connection }) => {
-      if (connection === "open") {
-        await delay(7000);
+      sock.ev.on("connection.update", async ({ connection }) => {
+        if (connection === "open") {
+          await delay(7000);
 
-        const filePath = `${sessionPath}/creds.json`;
-        if (!fs.existsSync(filePath)) return;
+          const filePath = `${sessionPath}/creds.json`;
+          if (!fs.existsSync(filePath)) return;
 
-        const megaUrl = await uploadToMega(filePath);
-        const sessionId = megaUrl.replace('https://mega.nz/file/', '');
+          const megaUrl = await uploadToMega(filePath);
+          const sessionId = megaUrl.replace('https://mega.nz/file/', '');
 
-        const message1 = `*✅ Your Session ID:*\n\n${sessionId}`;
-        const message2 = `
+          const message1 = `*✅ Your Session ID:*\n\n${sessionId}`;
+          const message2 = `
 ╭─❍ *Vinnie-MD Session Paired*
 ├ 📎 Use this ID in your bot repo
 ├ 🎓 Tutorial: youtube.com/@vinniebot
@@ -89,16 +90,20 @@ app.post('/code', async (req, res) => {
 ╰─❍ *Enjoy Vinnie MD v5.0.0*
 `;
 
-        await sock.sendMessage(sock.user.id, { text: message1 });
-        await sock.sendMessage(sock.user.id, { text: message2 });
+          await sock.sendMessage(sock.user.id, { text: message1 });
+          await sock.sendMessage(sock.user.id, { text: message2 });
 
-        await delay(2000);
-        await sock.ws.close();
-        cleanUp(sessionPath);
-      }
-    });
+          await delay(2000);
+          await sock.ws.close();
+          cleanUp(sessionPath);
+        }
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Failed to generate pairing code.' });
+    }
   } else {
-    res.status(400).send({ error: 'Already registered.' });
+    res.status(400).json({ error: 'Already registered.' });
   }
 });
 
