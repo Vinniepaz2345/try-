@@ -128,48 +128,54 @@
     <button id="copy-btn">Copy Code</button>
     <div id="footer-text">Use this code in WhatsApp > Link a device > Enter code</div>
   </div>
+<script>
+  const form = document.getElementById('code-form');
+  const phoneInput = document.getElementById('phone');
+  const loading = document.getElementById('loading');
+  const container = document.getElementById('code-container');
+  const codeBox = document.getElementById('code-box');
+  const copyBtn = document.getElementById('copy-btn');
 
-  <script>
-    const form = document.getElementById('code-form');
-    const phoneInput = document.getElementById('phone');
-    const loading = document.getElementById('loading');
-    const container = document.getElementById('code-container');
-    const codeBox = document.getElementById('code-box');
-    const copyBtn = document.getElementById('copy-btn');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const phone = phoneInput.value.trim();
+    if (!phone) return;
 
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const phone = phoneInput.value.trim();
-      if (!phone) return;
+    form.style.display = 'none';
+    loading.style.display = 'flex';
 
-      form.style.display = 'none';
-      loading.style.display = 'flex';
+    try {
+      const res = await fetch('/code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number: phone })
+      });
 
-      try {
-        const res = await fetch(`/code?number=${encodeURIComponent(phone)}`);
-        const data = await res.json();
-        const code = data.pairingCode || 'ERROR';
+      const data = await res.json();
+      const code = data.pairingCode || 'ERROR';
 
-        loading.style.display = 'none';
-        container.style.display = 'flex';
+      loading.style.display = 'none';
+      container.style.display = 'flex';
 
-        code.split('').forEach(char => {
-          const span = document.createElement('span');
-          span.className = 'char-box';
-          span.textContent = char;
-          codeBox.appendChild(span);
+      codeBox.innerHTML = '';
+      code.split('').forEach(char => {
+        const span = document.createElement('span');
+        span.className = 'char-box';
+        span.textContent = char;
+        codeBox.appendChild(span);
+      });
+
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(code).then(() => {
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => copyBtn.textContent = 'Copy Code', 2000);
         });
-
-        copyBtn.onclick = () => {
-          navigator.clipboard.writeText(code).then(() => {
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => copyBtn.textContent = 'Copy Code', 2000);
-          });
-        };
-      } catch (err) {
-        loading.innerHTML = '<p style="color:red">Something went wrong.</p>';
-      }
-    };
-  </script>
+      };
+    } catch (err) {
+      loading.innerHTML = '<p style="color:red">Something went wrong.</p>';
+      console.error(err);
+    }
+  };
+</script>
 </body>
 </html>
